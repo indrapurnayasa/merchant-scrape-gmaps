@@ -1,11 +1,5 @@
-selenium==4.21.0
+streamlit==1.31.0
+selenium==4.16.0
+pandas==2.1.4
 webdriver-manager==4.0.1
-beautifulsoup4==4.12.3
-streamlit
 pandas
-chromedriver-py
-libglib2.0-0
-libnss3
-libgconf-2-4
-libfontconfig1
-libxss1
