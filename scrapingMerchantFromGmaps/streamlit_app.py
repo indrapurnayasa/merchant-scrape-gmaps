@@ -214,49 +214,49 @@ def main():
     query = st.text_input("Enter business name and location:")
     
     if st.button("Search"):
-    driver = None  # Initialize the driver variable
-    try:
-        with st.spinner("Scraping Google Maps..."):
-            driver = setup_driver()  # Assign the driver instance
-            search_place(driver, query)
-            
-            # Scroll and fetch all results
-            all_results = scroll_results(driver)
-            
-            # Initialize list to store results
-            results_data = []
-            
-            progress_bar = st.progress(0)
-            for idx, result in enumerate(all_results):
-                driver.execute_script("arguments[0].scrollIntoView({block: 'start'});", result)
-                time.sleep(1)
-                result.click()
-                time.sleep(2)
-                details = get_place_details(driver)
+        driver = None  # Initialize the driver variable
+        try:
+            with st.spinner("Scraping Google Maps..."):
+                driver = setup_driver()  # Assign the driver instance
+                search_place(driver, query)
                 
-                # Replace newline characters in "hours" with a delimiter
-                if "hours" in details and isinstance(details["hours"], str):
-                    details["hours"] = details["hours"].replace("\n", " | ")  # Replace newline with " | "
+                # Scroll and fetch all results
+                all_results = scroll_results(driver)
                 
-                results_data.append(details)
+                # Initialize list to store results
+                results_data = []
                 
-                # Update progress
-                progress = (idx + 1) / len(all_results)
-                progress_bar.progress(progress)
-            
-            # Save results in session state
-            st.session_state.results_data = results_data
+                progress_bar = st.progress(0)
+                for idx, result in enumerate(all_results):
+                    driver.execute_script("arguments[0].scrollIntoView({block: 'start'});", result)
+                    time.sleep(1)
+                    result.click()
+                    time.sleep(2)
+                    details = get_place_details(driver)
+                    
+                    # Replace newline characters in "hours" with a delimiter
+                    if "hours" in details and isinstance(details["hours"], str):
+                        details["hours"] = details["hours"].replace("\n", " | ")  # Replace newline with " | "
+                    
+                    results_data.append(details)
+                    
+                    # Update progress
+                    progress = (idx + 1) / len(all_results)
+                    progress_bar.progress(progress)
+                
+                # Save results in session state
+                st.session_state.results_data = results_data
 
-            # Display results
-            st.write(f"Found {len(results_data)} results:")
-            st.dataframe(pd.DataFrame(results_data))
-            
-    except Exception as e:
-        st.error(f"An error occurred: {str(e)}")
-    
-    finally:
-        if driver:  # Check if driver was initialized
-            driver.quit()
+                # Display results
+                st.write(f"Found {len(results_data)} results:")
+                st.dataframe(pd.DataFrame(results_data))
+                
+        except Exception as e:
+            st.error(f"An error occurred: {str(e)}")
+        
+        finally:
+            if driver:  # Check if driver was initialized
+                driver.quit()
 
     # Display results from session state if available
     if st.session_state.results_data:
