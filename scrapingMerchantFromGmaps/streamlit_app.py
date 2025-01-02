@@ -6,6 +6,8 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
 import pandas as pd
 import time
 import re
@@ -13,8 +15,17 @@ import re
 def setup_driver():
     options = Options()
     options.add_argument('--start-maximized')
-    options.add_argument('--headless')  
-    return webdriver.Chrome(options=options)
+    options.add_argument('--headless')  # Run in headless mode for servers
+    options.add_argument('--disable-dev-shm-usage')  # Overcome resource limitations
+    options.add_argument('--no-sandbox')  # Necessary for some server environments
+    options.add_argument('--disable-gpu')  # Optional: Avoid GPU issues
+    
+    # For Streamlit Cloud, set the Chrome binary path
+    options.binary_location = "/usr/bin/google-chrome"
+
+    # Use webdriver-manager to install and set up the driver
+    service = Service(ChromeDriverManager().install())
+    return webdriver.Chrome(service=service, options=options)
 
 def search_place(driver, query):
     driver.get("https://www.google.com/maps")
