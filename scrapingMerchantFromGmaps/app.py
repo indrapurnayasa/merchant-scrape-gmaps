@@ -1,37 +1,30 @@
 from scrapingGmaps import GoogleMapsScraper
 import time
 
-if __name__ == "__main__":
-    # Initialize the scraper
+def main():
     scraper = GoogleMapsScraper()
+    try:
+        # Search for the place
+        place = "Fore Coffee Jakarta Pusat"
+        if scraper.search_place(place):
+            # Process all results
+            all_details = scraper.process_all_results()
+            
+            # Print all collected details
+            print("\nAll collected place details:")
+            for i, (name, address, website) in enumerate(all_details, 1):
+                print(f"\n{i}. {name}")
+                print(f"Address: {address}")
+                print(f"Website: {website}")
+                print("-" * 50)
+            
+            print(f"\nTotal unique places processed: {len(all_details)}")
+            print(f"Total unique names found: {len(scraper.processed_names)}")
+            
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    finally:
+        scraper.close()
 
-    # Search for the place
-    place = "waterboom kalimantan selatan"
-    scraper.search_place(place)
-
-    # Get search results
-    results = scraper.get_search_results()
-
-    # Iterate over each search result and get details
-    for result in results:
-        # Click on the search result
-        result.click()
-        time.sleep(5)  # Wait for the place details to load
-
-        # Get place details
-        try:
-            name, address, website, latitude, longitude = scraper.get_place_details()
-            print("Name:", name)
-            print("Address:", address)
-            print("Website:", website)
-            print("Latitude:", latitude)
-            print("Longitude:", longitude)
-        except Exception as e:
-            print("Error getting details for a place:", e)
-
-        # Go back to the search results
-        scraper.driver.execute_script("window.history.go(-1)")
-        time.sleep(5)  # Wait for the search results to load
-
-    # Close the scraper
-    scraper.close()
+if __name__ == "__main__":
+    main()

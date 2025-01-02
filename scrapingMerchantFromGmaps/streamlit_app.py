@@ -1,16 +1,19 @@
+import streamlit as st
 from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException
+from selenium.common.exceptions import TimeoutException
+import pandas as pd
 import time
 import re
 
 def setup_driver():
-    options = webdriver.ChromeOptions()
+    options = Options()
     options.add_argument('--start-maximized')
-    options.add_argument('--headless')
+    options.add_argument('--headless')  
     return webdriver.Chrome(options=options)
 
 def search_place(driver, query):
@@ -21,6 +24,7 @@ def search_place(driver, query):
     search_box.send_keys(query)
     search_box.send_keys(Keys.ENTER)
     time.sleep(3)
+
 
 def format_opening_hours(hours_text):
     if hours_text == "N/A":
@@ -99,30 +103,40 @@ def format_opening_hours(hours_text):
 def scroll_results(driver):
     try:
         result_items_selector = ".Nv2PK"
+        
+        # Wait for initial results to load
         results = WebDriverWait(driver, 10).until(
             EC.presence_of_all_elements_located((By.CSS_SELECTOR, result_items_selector))
         )
         
-        if not results:
-            print("No results found to scroll.")
-            return False
+        last_count = 0  # Keeps track of the previous number of results
+        max_attempts = 20  # Set a reasonable limit to avoid infinite loops
+        attempts = 0
         
-        last_count = len(results)
-        while True:
-            results[-1].location_once_scrolled_into_view
-            time.sleep(2)
+        while attempts < max_attempts:
+            driver.execute_script("arguments[0].scrollIntoView();", results[-1])
+            time.sleep(2)  # Allow time for more results to load
             
+            # Fetch new results after scrolling
             results = driver.find_elements(By.CSS_SELECTOR, result_items_selector)
+            
+            # Check if no new results are loaded
             if len(results) == last_count:
-                break
-            last_count = len(results)
+                attempts += 1
+            else:
+                attempts = 0  # Reset attempts if new results are found
+            
+            last_count = len(results)  # Update the count of results
         
-        print(f"Scrolled through {len(results)} results.")
-        return True
+        print(f"Total results found after scrolling: {len(results)}")
+        return results
 
     except TimeoutException:
         print("Timeout while scrolling results.")
-        return False
+        return []
+    except Exception as e:
+        print(f"An error occurred while scrolling: {str(e)}")
+        return []
 
 def get_phone_number(driver):
     try:
@@ -148,6 +162,8 @@ def get_place_details(driver):
         name = WebDriverWait(driver, 10).until(
             EC.presence_of_element_located((By.CLASS_NAME, "DUwDvf"))
         ).text
+        # Remove commas from the name
+        name = name.replace(',', '')
     except:
         name = "N/A"
         
@@ -186,41 +202,84 @@ def get_place_details(driver):
         "hours": hours
     }
 
+
 def main():
-    driver = setup_driver()
-    query = ("Fore Coffee Jakarta Pusat")
+    st.set_page_config(page_title="Google Maps Crawler", page_icon="🌍")
+    st.title("Google Maps Business Crawler")
     
-    try:
-        search_place(driver, query)
-        has_results = scroll_results(driver)
+    # Initialize session state
+    if "results_data" not in st.session_state:
+        st.session_state.results_data = None
+
+    # Search input
+    query = st.text_input("Enter business name and location:")
+    
+    if st.button("Search"):
+        try:
+            with st.spinner("Scraping Google Maps..."):
+                driver = setup_driver()
+                search_place(driver, query)
+                
+                # Scroll and fetch all results
+                all_results = scroll_results(driver)
+                
+                # Initialize list to store results
+                results_data = []
+                
+                progress_bar = st.progress(0)
+                for idx, result in enumerate(all_results):
+                    driver.execute_script("arguments[0].scrollIntoView({block: 'start'});", result)
+                    time.sleep(1)
+                    result.click()
+                    time.sleep(2)
+                    details = get_place_details(driver)
+                    
+                    # Replace newline characters in "hours" with a delimiter
+                    if "hours" in details and isinstance(details["hours"], str):
+                        details["hours"] = details["hours"].replace("\n", " | ")  # Replace newline with " | "
+                    
+                    results_data.append(details)
+                    
+                    # Update progress
+                    progress = (idx + 1) / len(all_results)
+                    progress_bar.progress(progress)
+                
+                # Save results in session state
+                st.session_state.results_data = results_data
+
+                # Display results
+                st.write(f"Found {len(results_data)} results:")
+                st.dataframe(pd.DataFrame(results_data))
+                
+        except Exception as e:
+            st.error(f"An error occurred: {str(e)}")
         
-        if has_results:
-            results = driver.find_elements(By.CLASS_NAME, "Nv2PK")
-            
-            for result in results:
-                driver.execute_script("arguments[0].scrollIntoView({block: 'start'});", result)
-                time.sleep(1)
-                result.click()
-                time.sleep(2)
-                details = get_place_details(driver)
-                print("Place Details:")
-                print(f"Name: {details['name']}")
-                print(f"Address: {details['address']}")
-                print(f"Phone Number: {details['phone']}")
-                print(f"Opening Hours:")
-                print(details['hours'])
-                print("-" * 50)
-        else:
-            details = get_place_details(driver)
-            print("Place Details:")
-            print(f"Name: {details['name']}")
-            print(f"Address: {details['address']}")
-            print(f"Phone Numbers: {details['phone']}")
-            print(f"Opening Hours:")
-            print(details['hours'])
-            
-    finally:
-        driver.quit()
+        finally:
+            driver.quit()
+
+    # Display results from session state if available
+    if st.session_state.results_data:
+        results_data = st.session_state.results_data
+        df = pd.DataFrame(results_data)
+
+        # Generate file name based on query
+        sanitized_query = re.sub(r'[^\w\s]', '', query).strip().replace(' ', '_')
+        file_name = f"{sanitized_query}_google_maps_results.csv"
+
+        # Convert DataFrame to CSV
+        csv = df.to_csv(index=False, encoding='utf-8', quoting=1).encode('utf-8')
+
+        # Display results
+        st.write("Results:")
+        st.dataframe(df)
+
+        # Add download button
+        st.download_button(
+            label="Download results as CSV",
+            data=csv,
+            file_name=file_name,
+            mime="text/csv"
+        )
 
 if __name__ == "__main__":
     main()
