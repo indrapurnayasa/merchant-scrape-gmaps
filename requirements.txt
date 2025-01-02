@@ -3,7 +3,7 @@ webdriver-manager==4.0.1
 beautifulsoup4==4.12.3
 streamlit
 pandas
-chromium-chromedriver
+chromedriver-py
 libglib2.0-0
 libnss3
 libgconf-2-4
